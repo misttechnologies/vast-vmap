@@ -382,25 +382,23 @@ function VMAP(server, adHandler, breakHandler) {
       var targetedAdHandler = adHandler.bind(that, that.breaks.length, position);
 
       var vast = bn.getElementsByTagNameNS(VMAPNS, 'VASTData');
-      if (vast) {
-        adbreak.ad = new VASTAds(vast.item(0).getElementByTagName(null, 'VAST').item(0), targetedAdHandler);
+      if (vast && vast.length > 0) {
+        // TODO Check if it is a correct binding
+        adbreak.ad = new VASTAds(vast.item(0).getElementByTagName(null, 'VAST').item(0),
+                                 adHandler.bind(that, i, adbreak.position));
       } else {
         var uri = bn.getElementsByTagNameNS(VMAPNS, 'AdTagURI');
-        if (uri) {
-          var storeAd;
-          (function(adbreak) {
-            storeAd = function(ad) {
-              adbreak.ad = ad;
-              if (ad !== null) {
-                targetedAdHandler(ad);
-              }
-            };
-          })(adbreak);
-          queryVAST(uri.item(0).textContent.replace(/\s/g, ""), storeAd);
-        } else {
+        if (!uri) {
           console.error("No supported ad target for break #" + i);
           continue;
         }
+        // XXX Check if it is a correct binding
+        (function(idx, adbreak) {
+          queryVAST(uri.item(0).textContent.replace(/\s/g, ""), function(ad) {
+            adbreak.ad = ad;
+            adHandler(idx, adbreak.position, ad);
+          });
+        })(i, adbreak);
       }
 
       that.breaks.push(adbreak);
@@ -463,9 +461,9 @@ function VASTAds(root, onAdsAvailable, onError, parentAd) {
 
   var that = this;
 
-  if (adElements.length == 0) {
+  if (adElements.length === 0) {
     onError();
-    return
+    return;
   }
 
   var onAdError = function () {
@@ -1316,6 +1314,7 @@ VASTLinear.prototype.getTrackingPoints = function() {
 
   for (var i = 0; i < events.length; i++) {
     var point = {"event": events[i]["event"], "offset": null, "percentOffset": null};
+    var offset;
     switch (events[i]["event"]) {
       case "start":
         point["percentOffset"] = "0%";
@@ -1346,7 +1345,7 @@ VASTLinear.prototype.getTrackingPoints = function() {
         }
         break;
       case "skip":
-        var offset = this.attribute('skipoffset', 0);
+        offset = this.attribute('skipoffset', 0);
         if(offset.indexOf('%') === -1) {
           point["offset"] = VASTCreative.prototype.timecodeFromString(offset);
           if (duration) {
@@ -1361,7 +1360,7 @@ VASTLinear.prototype.getTrackingPoints = function() {
         break;
       default:
         // progress-...
-        var offset = events[i]["offset"];
+        offset = events[i]["offset"];
         if (!offset) {
           continue;
         }
@@ -1397,7 +1396,7 @@ VASTLinear.prototype.getTrackingPoints = function() {
     return 0;
   });
 
-  return points
+  return points;
 };
 
 /**
